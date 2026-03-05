@@ -30,10 +30,36 @@ public class Server {
         }
     }
 
+    // Prints the list of connected clients to the server terminal
+    static void printConnectedClients() {
+        if (clientMap.isEmpty()) {
+            System.out.println("No clients currently connected.");
+        } else {
+            System.out.println("Connected clients (" + clientMap.size() + "):");
+            for (ClientInfo info : clientMap.values()) {
+                System.out.println("  " + info);
+            }
+        }
+    }
+
     public static void main(String[] args) {
         try {
             ServerSocket serverSocket = new ServerSocket(6013);
             System.out.println("Server started. Waiting for clients...");
+            System.out.println("Type '!list' in this terminal to see connected clients.");
+
+            // Background thread: reads commands typed directly in the server terminal
+            Thread consoleThread = new Thread(() -> {
+                Scanner scanner = new Scanner(System.in);
+                while (scanner.hasNextLine()) {
+                    String cmd = scanner.nextLine().trim();
+                    if (cmd.equalsIgnoreCase("!list")) {
+                        printConnectedClients();
+                    }
+                }
+            });
+            consoleThread.setDaemon(true);
+            consoleThread.start();
 
             while (true) {
                 Socket client = serverSocket.accept();
@@ -43,18 +69,6 @@ public class Server {
         } catch (IOException ioe) {
             System.err.println(ioe);
         }
-    }
-
-    // Returns a formatted list of all currently connected clients
-    static String getConnectedClientsList() {
-        if (clientMap.isEmpty()) {
-            return "No clients currently connected.";
-        }
-        StringBuilder sb = new StringBuilder("Connected clients (" + clientMap.size() + "):\n");
-        for (ClientInfo info : clientMap.values()) {
-            sb.append("  ").append(info).append("\n");
-        }
-        return sb.toString().trim();
     }
 
     static class ClientHandler implements Runnable {
@@ -103,19 +117,8 @@ public class Server {
                 // --- Message loop ---
                 String message;
                 while ((message = bin.readLine()) != null) {
-                    if (message.equalsIgnoreCase("!list")) {
-                        // Send connected clients list — uses "---END---" as a sentinel
-                        // so the client knows when the multi-line response is done
-                        String list = getConnectedClientsList();
-                        for (String line : list.split("\n")) {
-                            pout.println(line);
-                        }
-                        pout.println("---END---");
-                        System.out.println("[" + name + "] requested the client list.");
-                    } else {
-                        System.out.println("[" + name + "]: " + message);
-                        pout.println("Message received.");
-                    }
+                    System.out.println("[" + name + "]: " + message);
+                    pout.println("Message received.");
                 }
 
                 // --- Cleanup on disconnect ---
